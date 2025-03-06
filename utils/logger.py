@@ -57,7 +57,7 @@ def get_logger(console_level=logging.INFO, max_log=MAX_LOG):
     if logger.hasHandlers():
         return logger
 
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(console_level)

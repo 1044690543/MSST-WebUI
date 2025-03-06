@@ -24,7 +24,7 @@ prodigyopt
 protobuf==3.20.3
 psutil
 rotary_embedding_torch==0.3.5
-samplerate
+# samplerate
 scipy
 segmentation_models_pytorch==0.3.3
 soundfile

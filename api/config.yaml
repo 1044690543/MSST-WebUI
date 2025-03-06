@@ -1,0 +1,10 @@
+debug: false
+device: 'auto'
+device_ids: [0]
+input_folder: 'input'
+output_folder: 'results'
+output_format: 'wav'
+use_tta: false
+wav_bit_depth: 'FLOAT'
+flac_bit_depth: 'PCM_24'
+mp3_bit_rate: '320k'

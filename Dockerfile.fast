@@ -1,0 +1,20 @@
+FROM msst:base
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install nacos-python-sdk==0.2 loguru==0.7.3
+
+CMD ["python", "/app/api/msst_api.py"]
+
+# docker build -f Dockerfile.fast -t msst:1.0 .
+# docker run -itd --gpus device=0 --restart=always -v D:\Desktop\project\caoshumeng\MSST-mygithub\MSST-WebUI:/app -p 2769:2769  --name msst msst:1.0 bash
+# sudo docker run -itd --gpus device=0 --restart=always -p 2769:2769 --name msst msst:1.0
+
+# 241部署命令
+# sudo docker run -itd -e IS_MAAS=1 -e WORKER_IP=10.25.20.241 -e NACOS_ADDRESSES=10.25.20.20:38848 -e NACOS_SERVICE_IP=10.25.20.241 --gpus device=3 -p 2769:2769 -v /data/aigc_dir/seed_audio:/data/aigc_dir/seed_audio --restart=always --name msst msst:1.0
+
+# V1 上线版本 msst20250318.tar
+
+# docker run -itd --gpus all -p 2769:2769 --restart=always --name msst-live msst:live
