@@ -1,0 +1,21 @@
+FROM python:3.10
+
+WORKDIR /env
+
+COPY requirements.txt /env
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 备份原始源文件, 编辑源文件
+RUN cp /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list.d/debian.sources.backup && \
+    sed -i 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's|http://deb.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y vim && \
+    apt-get install ffmpeg -y && \
+    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121 && \
+    pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 将此镜像保存为基础镜像
+# docker build -f Dockerfile.base -t msst:base .
