@@ -1,0 +1,12 @@
+FROM msst:base
+
+WORKDIR /app
+
+COPY . /app
+
+
+CMD ["python", "/app/api/msst_api.py"]
+
+# docker build -f Dockerfile.fast -t msst:1.0 .
+# docker run -itd --gpus device=0 --restart=always -v D:\Desktop\project\caoshumeng\MSST-WebUI:/app -p 2769:2769  --name msst msst:1.0 bash
+# sudo docker run -itd --gpus device=7 --restart=always -p 2769:2769 --name msst msst:1.0

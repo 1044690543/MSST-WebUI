@@ -37,6 +37,7 @@ Import this configuration file to access defined paths and settings throughout t
 import os
 import sys
 import json
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # webui config path
 WEBUI_CONFIG = "data/webui_config.json"

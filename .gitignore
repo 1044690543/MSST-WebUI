@@ -41,3 +41,5 @@ results.zip
 *.chpt
 *.pyd
 *.c
+*.mp3
+*.wav
