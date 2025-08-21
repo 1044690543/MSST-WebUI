@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 logger = get_logger(console_level=logging.INFO)
 
-from constents import SERVICE_IP, SERVICE_PORT, MSST_DIR, MSST_DIR_TMP, IS_MAAS
+from constents import SERVICE_IP, SERVICE_PORT, MSST_DIR, MSST_DIR_TMP, IS_MAAS, MSST_INFER_OBJECT
 from nacos_service import service_register, config_register, service_beat
 from schema.response import GeneralResponse, RespStatus
 from clogs import clogger
@@ -33,18 +33,21 @@ app = FastAPI()
 model_info = {
     'dereverb': 
         {
+            'model_name': "dereverb",
             'model_type': "mel_band_roformer",
             "model_path": "pretrain/single_stem_models/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
             "config_path": "configs/single_stem_models/dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt.yaml"
         },
     "karaoke":
         {
+            'model_name': "karaoke",
             'model_type': "mel_band_roformer",
             "model_path": "pretrain/vocal_models/model_mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
             "config_path": "configs/vocal_models/model_mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt.yaml"
         },
     "htdemucs4":
         {
+            'model_name': "htdemucs4",
             'model_type': "htdemucs",
             "model_path": "pretrain/multi_stem_models/HTDemucs4_6stems.th",
             "config_path": "configs/multi_stem_models/HTDemucs4_6stems.th.yaml"
@@ -91,7 +94,7 @@ def base64_to_file(file_path: str, base64_data: str):
     with open(file_path, 'wb') as file:
         file.write(decoded_data)
 
-def msst_inference(file_path: str, output_dir: dict, model_type: str, model_path: str, model_config_path: str):
+def msst_inference(file_path: str, output_dir: dict, model_type: str, model_path: str, model_config_path: str, model_name: str):
     if not config['debug']:
         warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -99,25 +102,39 @@ def msst_inference(file_path: str, output_dir: dict, model_type: str, model_path
 
     start_time = time()
 
-    separator = MSSeparator(
-        model_type=model_type,
-        config_path=model_config_path,
-        model_path=model_path,
-        device=config['device'],
-        device_ids=device_ids,
-        output_format=config['output_format'],
-        use_tta=config['use_tta'],
-        store_dirs=output_dir,
-        audio_params={
-            "wav_bit_depth": config['wav_bit_depth'],
-            "flac_bit_depth": config['flac_bit_depth'],
-            "mp3_bit_rate": config['mp3_bit_rate']
-        },
-        logger=logger,
-        debug=config['debug']
-    )
-    success_files = separator.process_folder(file_path)
-    separator.del_cache()
+    separator_name = f"separator_{model_name}"
+
+    if separator_name in MSST_INFER_OBJECT:
+        separator = MSST_INFER_OBJECT[separator_name]
+        clogger.info(f"MSST_INFER_OBJECT:{MSST_INFER_OBJECT}")
+        clogger.info(f"Using existing {separator_name} object.")
+    else:
+        clogger.info(f"Creating new {separator_name} object.")
+        separator = MSSeparator(
+            model_type=model_type,
+            config_path=model_config_path,
+            model_path=model_path,
+            device=config['device'],
+            device_ids=device_ids,
+            output_format=config['output_format'],
+            use_tta=config['use_tta'],
+            audio_params={
+                "wav_bit_depth": config['wav_bit_depth'],
+                "flac_bit_depth": config['flac_bit_depth'],
+                "mp3_bit_rate": config['mp3_bit_rate']
+            },
+            logger=logger,
+            debug=config['debug'],
+            inference_params = {
+                    "batch_size": 12,
+                    "num_overlap": None,
+                    "chunk_size": None,
+                    "normalize": None
+                }
+        )
+        MSST_INFER_OBJECT[separator_name] = separator
+    success_files = separator.process_folder(file_path, output_dir)
+    # separator.del_cache()
     clogger.info(f"Successfully separated files: {success_files}, total time: {time() - start_time:.2f} seconds.")
     return success_files
 
@@ -177,6 +194,10 @@ async def separate(vdata: VocalsData, background_tasks: BackgroundTasks):
         base64_to_file(input_audio_path, vdata.input_audio_base64)
     elif vdata.input_audio_mode == "path":
         # 把 vdata.input_audio_path 复制到 input_audio_path
+        if not os.path.exists(vdata.input_audio_path):
+            clogger.error(f"输入音频路径 {vdata.input_audio_path} 不存在")
+            response.set_obj(RespStatus.FAILED, success=False, err_msg=f"输入音频路径 {vdata.input_audio_path} 不存在")
+            return response
         shutil.copy(vdata.input_audio_path, input_audio_path)
     elif vdata.input_audio_mode == "url":
         download_audio_from_url(vdata.input_audio_url, input_audio_path)
@@ -198,6 +219,7 @@ async def separate(vdata: VocalsData, background_tasks: BackgroundTasks):
         model_info["karaoke"]["model_type"],
         model_info["karaoke"]["model_path"],
         model_info["karaoke"]["config_path"],
+        model_info["karaoke"]["model_name"],
     )
 
     noreverb_karaoke_path = os.path.join(noreverb_karaoke_dir, "input_audio_karaoke_noreverb.wav")
@@ -210,6 +232,7 @@ async def separate(vdata: VocalsData, background_tasks: BackgroundTasks):
         model_info["dereverb"]["model_type"],
         model_info["dereverb"]["model_path"],
         model_info["dereverb"]["config_path"],
+        model_info["dereverb"]["model_name"],
     )
     vocals_path = noreverb_karaoke_path
 
@@ -263,6 +286,7 @@ async def audio_track_split(sdata: SData, background_tasks: BackgroundTasks):
         model_info["htdemucs4"]["model_type"],
         model_info["htdemucs4"]["model_path"],
         model_info["htdemucs4"]["config_path"],
+        model_info["htdemucs4"]["model_name"],
     )
 
     clogger.info(f"run dereverb model")
@@ -274,6 +298,7 @@ async def audio_track_split(sdata: SData, background_tasks: BackgroundTasks):
         model_info["dereverb"]["model_type"],
         model_info["dereverb"]["model_path"],
         model_info["dereverb"]["config_path"],
+        model_info["dereverb"]["model_name"],
     )
 
     response = {

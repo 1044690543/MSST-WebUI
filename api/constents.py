@@ -44,3 +44,6 @@ NACOS_SERVICE_NAME=os.environ.get("NACOS_SERVICE_NAME")  # infer 服务名称
 NACOS_SERVICE_VOCALS=os.environ.get("NACOS_SERVICE_VOCALS")  # 接口名称
 NACOS_SERVICE_IP=os.environ.get("NACOS_SERVICE_IP", None) if os.environ.get("NACOS_SERVICE_IP", None) else LOCAL_IP  # AI服务接口所在地址
 NACOS_GROUP_NAME=os.environ.get("NACOS_GROUP_NAME")
+
+# 初始化的三个模型
+MSST_INFER_OBJECT = {}

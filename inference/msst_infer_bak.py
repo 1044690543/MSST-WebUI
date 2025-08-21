@@ -24,6 +24,7 @@ class MSSeparator:
             device_ids = [0],
             output_format = 'wav',
             use_tta = False,
+            store_dirs = 'results', # str for single folder, dict with instrument keys for multiple folders
             audio_params = {"wav_bit_depth": "FLOAT", "flac_bit_depth": "PCM_24", "mp3_bit_rate": "320k"},
             logger = get_logger(),
             debug = False,
@@ -50,6 +51,7 @@ class MSSeparator:
         self.model_path = model_path
         self.output_format = output_format
         self.use_tta = use_tta
+        self.store_dirs = store_dirs
         self.audio_params = audio_params
         self.debug = debug
 
@@ -83,6 +85,15 @@ class MSSeparator:
 
         self.model, self.config = self.load_model()
 
+        if type(self.store_dirs) == str:
+            self.store_dirs = {k: self.store_dirs for k in self.config.training.instruments}
+
+        for key in list(self.store_dirs.keys()):
+            if key not in self.config.training.instruments and key.lower() not in self.config.training.instruments:
+                self.store_dirs.pop(key)
+                self.logger.warning(f"Invalid instrument key: {key}, removing from store_dirs")
+                self.logger.warning(f"Valid instrument keys: {self.config.training.instruments}")
+
     def log_system_info(self):
         os_name = platform.system()
         os_version = platform.version()
@@ -108,7 +119,7 @@ class MSSeparator:
 
         self.update_inference_params(config, self.inference_params)
 
-        self.logger.info(f"Separator params: model_type: {self.model_type}, model_path: {self.model_path}, config_path: {self.config_path}")
+        self.logger.info(f"Separator params: model_type: {self.model_type}, model_path: {self.model_path}, config_path: {self.config_path}, output_folder: {self.store_dirs}")
         self.logger.info(f"Audio params: output_format: {self.output_format}, audio_params: {self.audio_params}")
         self.logger.info(f"Model params: instruments: {config.training.get('instruments', None)}, target_instrument: {config.training.get('target_instrument', None)}")
         self.logger.debug(f"Model params: batch_size: {config.inference.get('batch_size', None)}, num_overlap: {config.inference.get('num_overlap', None)}, chunk_size: {config.audio.get('chunk_size', None)}, normalize: {config.inference.get('normalize', None)}, use_tta: {self.use_tta}")
@@ -130,20 +141,9 @@ class MSSeparator:
         self.logger.debug(f"Loading model completed, duration: {time() - start_time:.2f} seconds")
         return model, config
 
-    def process_folder(self, input_folder, store_dirs="results"):
+    def process_folder(self, input_folder):
         if not os.path.isdir(input_folder):
             raise ValueError(f"Input folder '{input_folder}' does not exist.")
-
-        # 每次调用时重新生成 store_dirs 映射
-        if isinstance(store_dirs, str):
-            store_dirs = {k: store_dirs for k in self.config.training.instruments}
-        else:
-            # 校验合法性
-            for key in list(store_dirs.keys()):
-                if key not in self.config.training.instruments and key.lower() not in self.config.training.instruments:
-                    store_dirs.pop(key)
-                    self.logger.warning(f"Invalid instrument key: {key}, removing from store_dirs")
-                    self.logger.warning(f"Valid instrument keys: {self.config.training.instruments}")
 
         all_mixtures_path = [os.path.join(input_folder, f) for f in os.listdir(input_folder)]
 
@@ -172,7 +172,7 @@ class MSSeparator:
             file_name, _ = os.path.splitext(os.path.basename(path))
 
             for instr in results.keys():
-                save_dir = store_dirs.get(instr, "")
+                save_dir = self.store_dirs.get(instr, "")
                 if save_dir and type(save_dir) == str:
                     os.makedirs(save_dir, exist_ok=True)
                     self.save_audio(results[instr], sr, f"{file_name}_{instr}", save_dir)
